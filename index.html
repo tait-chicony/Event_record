@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>🔖 標籤資料上傳工具</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f9f9f9;
+      padding: 20px;
+      margin: 0;
+      max-width: 600px;
+      min-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
+    h2 { margin-bottom: 10px; }
+    .tag-button {
+      margin: 5px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: 1px solid #4CAF50;
+      background: white;
+      cursor: pointer;
+      width: auto;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .tag-button.active { background: #c8e6c9; }
+    #tagPanel { margin-top: 20px; }
+    .input-field { margin-bottom: 10px; }
+    input[type="text"] {
+      width: 100%;
+      max-width: 100%;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+    .upload-btn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #statusBox {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 8px;
+      background: #e0f7fa;
+      white-space: pre-line;
+      box-sizing: border-box;
+    }
+    #tagButtons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>🔖 標籤資料上傳工具</h2>
+<div id="tagButtons">標籤載入中...</div>
+<div id="tagPanel">請點選上方標籤按鈕</div>
+
+<div id="customTagSection" style="margin-top:10px; display:none;">
+  <label>新增標籤名稱：</label>
+  <input type="text" id="customTagName" placeholder="請輸入標籤名稱">
+</div>
+
+<div class="input-field">
+  <label>輸入內容：</label>
+  <input type="text" id="tagValue" placeholder="請輸入內容">
+</div>
+
+<button class="upload-btn" onclick="uploadData()">📤 上傳資料</button>
+
+<div id="statusBox">狀態顯示區</div>
+
+<script>
+const scriptUrl = "https://script.google.com/macros/s/AKfycbz7UCQxO6xk-WmDwcNAd7nGsbSHy0TSJwRYWR06YcmxPaurFRYzknBvSG9SJovrLscj/exec";
+
+let tagData = {};
+let selectedTag = "";
+
+function loadTags() {
+  fetch(`${scriptUrl}?action=ItemList`)
+    .then(res => res.json())
+    .then(result => {
+      if (result.status === "success" && Array.isArray(result.data)) {
+        result.data.forEach(row => {
+          const tag = row[0]?.trim();
+          if (tag) tagData[tag] = true;
+        });
+        renderTagButtons();
+      } else {
+        document.getElementById("tagButtons").innerText = "⚠️ 標籤資料格式錯誤";
+      }
+    })
+    .catch(err => {
+      console.error("讀取標籤失敗", err);
+      document.getElementById("tagButtons").innerText = "❌ 無法載入標籤，請稍後再試";
+    });
+}
+
+function renderTagButtons() {
+  const btnContainer = document.getElementById("tagButtons");
+  btnContainer.innerHTML = "";
+  Object.keys(tagData).forEach(tag => {
+    const btn = document.createElement("button");
+    btn.className = "tag-button";
+    btn.innerText = tag;
+    btn.id = `btn-${tag}`;
+    btn.addEventListener("click", () => selectTag(tag));
+    btnContainer.appendChild(btn);
+  });
+
+  const customBtn = document.createElement("button");
+  customBtn.className = "tag-button";
+  customBtn.innerText = "其他";
+  customBtn.id = "btn-custom";
+  customBtn.addEventListener("click", () => selectTag("__custom__"));
+  btnContainer.appendChild(customBtn);
+}
+
+function selectTag(tag) {
+  selectedTag = tag;
+  Object.keys(tagData).forEach(t => {
+    const btn = document.getElementById(`btn-${t}`);
+    if (btn) btn.classList.remove("active");
+  });
+  const customBtn = document.getElementById("btn-custom");
+  if (customBtn) customBtn.classList.remove("active");
+
+  if (tag === "__custom__") {
+    document.getElementById("customTagSection").style.display = "block";
+    customBtn.classList.add("active");
+  } else {
+    document.getElementById("customTagSection").style.display = "none";
+    const thisBtn = document.getElementById(`btn-${tag}`);
+    if (thisBtn) thisBtn.classList.add("active");
+  }
+}
+
+function uploadData() {
+  const value = document.getElementById("tagValue").value.trim();
+  const customName = document.getElementById("customTagName").value.trim();
+
+  let title = selectedTag;
+  if (title === "__custom__") {
+    if (!customName) {
+      alert("⚠️ 請輸入自訂標籤名稱");
+      return;
+    }
+    title = customName;
+  }
+
+  if (!title || !value) {
+    alert("⚠️ 請選擇標籤並輸入內容");
+    return;
+  }
+
+  document.getElementById("statusBox").innerText = "⏳ 上傳中...";
+
+  fetch(`${scriptUrl}?action=WriteData&title=${encodeURIComponent(title)}&note=${encodeURIComponent(value)}`)
+    .then(res => res.text())
+    .then(msg => {
+      document.getElementById("statusBox").innerText = `✅ 上傳成功：${msg}`;
+      document.getElementById("tagValue").value = "";
+      document.getElementById("customTagName").value = "";
+      selectedTag = "";
+
+      Object.keys(tagData).forEach(t => {
+        const btn = document.getElementById(`btn-${t}`);
+        if (btn) btn.classList.remove("active");
+      });
+      const customBtn = document.getElementById("btn-custom");
+      if (customBtn) customBtn.classList.remove("active");
+      document.getElementById("customTagSection").style.display = "none";
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById("statusBox").innerText = `❌ 上傳失敗：${err.message}`;
+    });
+}
+
+document.addEventListener("DOMContentLoaded", loadTags);
+</script>
+
+</body>
+</html>
